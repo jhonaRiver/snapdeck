@@ -18,12 +18,18 @@ soup = BeautifulSoup(response.html.html, 'html.parser')
 
 # Find the HTML elements that contain card information
 card_list = soup.find_all('div', class_='cardname')
+card_tags = soup.find_all('span', class_='tag-item')
 
 # Iterate through card elements and extract relevant data
 for card in card_list:
     # Extract card attributes (e.g., name, type, mana cost, etc.)
     card_name = card.text
-    print(card_name)
+
+for tag in card_tags:
+    tag_text = tag.text.strip().lower()
+    if tag_text != 'none' and tag_text != 'unreleased':
+        card_tag = tag.text
+        print(card_tag)
 # card_type = card.find('span', class_='card-type').text
 # mana_cost = card.find('span', class_='mana-cost').text
 
