@@ -7,11 +7,11 @@ from bs4 import BeautifulSoup
 
 
 class Card:
-    def __init__(self, name, tag, description, energy, power):
+    def __init__(self, name, tag, description, cost, power):
         self.name = name
         self.tag = tag
         self.description = description
-        self.energy = energy
+        self.cost = cost
         self.power = power
 
 
@@ -30,13 +30,11 @@ soup = BeautifulSoup(response.html.html, 'html.parser')
 
 # Find the HTML elements that contain card information
 card_names = soup.find_all('div', class_='cardname')
-# card_tags = soup.find_all('span', class_='tag-item')
-# card_descriptions = soup.find_all('div', class_='card-description')
+card_tags = soup.find_all('span', class_='tag-item')
+card_descriptions = soup.find_all('div', class_='card-description')
 
 # List to store card instances
 cards = []
-
-# TODO: Save card names in list to use the other URL to get card descriptions
 
 # Iterate through card elements and extract relevant data
 for i in range(len(card_names)):
@@ -45,7 +43,19 @@ for i in range(len(card_names)):
         card_name = card_names[i].text.strip().lower()
         card_tag = tag_text
         card_description = card_descriptions[i].text.strip().lower()
-        cards.append(Card(card_name, card_tag, card_description))
+        response = session.get(url + card_name)
+        response.html.render()
+        soup = BeautifulSoup(response.html.html, 'html.parser')
+        card_cost = soup.find('div', class_='cost')
+        card_power = soup.find('div', class_='power')
+        cards.append(Card(card_name, card_tag,
+                     card_description, card_cost, card_power))
+
+print(cards[0].name)
+print(cards[0].tag)
+print(cards[0].description)
+print(cards[0].cost)
+print(cards[0].power)
 
 # Close the HTML session
 session.close()
