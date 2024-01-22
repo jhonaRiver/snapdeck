@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
 
-from requests_html import HTMLSession
+from requests_html import HTMLSession, AsyncHTMLSession
 from bs4 import BeautifulSoup
+
 
 # Create class to store card information
 
 
 class Card:
-    def __init__(self, name, tag, description, cost, power):
+    def __init__(self, name, tag, ability, cost, power):
         self.name = name
         self.tag = tag
-        self.description = description
+        self.ability = ability
         self.cost = cost
         self.power = power
 
@@ -29,33 +30,21 @@ response.html.render()
 soup = BeautifulSoup(response.html.html, 'html.parser')
 
 # Find the HTML elements that contain card information
-card_names = soup.find_all('div', class_='cardname')
-card_tags = soup.find_all('span', class_='tag-item')
-card_descriptions = soup.find_all('div', class_='card-description')
+card_list = soup.find_all('a', class_='simple-card')
+print(len(card_list))
 
 # List to store card instances
 cards = []
 
-# Iterate through card elements and extract relevant data
-for i in range(len(card_names)):
-    tag_text = card_tags[i].text.strip().lower()
-    if tag_text != 'none' and tag_text != 'unreleased':
-        card_name = card_names[i].text.strip().lower()
-        card_tag = tag_text
-        card_description = card_descriptions[i].text.strip().lower()
-        response = session.get(url + card_name)
-        response.html.render()
-        soup = BeautifulSoup(response.html.html, 'html.parser')
-        card_cost = soup.find('div', class_='cost')
-        card_power = soup.find('div', class_='power')
+for card in card_list:
+    card_tag = card.get('data-source').strip().lower()
+    if card_tag != 'none' and card_tag != 'unreleased':
+        card_name = card.get('data-name')
+        card_cost = card.get('data-cost')
+        card_power = card.get('data-power')
+        card_ability = card.get('data-ability')
         cards.append(Card(card_name, card_tag,
-                     card_description, card_cost, card_power))
+                     card_ability, card_cost, card_power))
+print(len(cards))
 
-print(cards[0].name)
-print(cards[0].tag)
-print(cards[0].description)
-print(cards[0].cost)
-print(cards[0].power)
-
-# Close the HTML session
 session.close()
