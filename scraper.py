@@ -2,6 +2,7 @@
 
 from requests_html import HTMLSession
 from bs4 import BeautifulSoup
+import psycopg2
 
 
 # Create class to store card information
@@ -41,10 +42,35 @@ for card in card_list:
         card_name = card.get('data-name')
         card_cost = card.get('data-cost')
         card_power = card.get('data-power')
-        card_ability = card.get('data-ability')
+        card_ability_html = card.get('data-ability')
+        card_ability_soup = BeautifulSoup(card_ability_html, 'html.parser')
+        card_ability = card_ability_soup.get_text()
         cards.append(Card(card_name, card_tag,
                      card_ability, card_cost, card_power))
 
 session.close()
 
-# TODO: Add card information to a database
+# Add card information to a database
+conn = psycopg2.connect("dbname=snapdeck_db user=postgres")
+cur = conn.cursor()
+
+cur.execute("""
+CREATE TABLE IF NOT EXISTS cards (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    tag VARCHAR(255),
+    ability TEXT,
+    cost INTEGER,
+    power INTEGER
+)
+""")
+
+for card in cards:
+    cur.execute("""
+    INSERT INTO cards (name, tag, ability, cost, power)
+    VALUES (%s, %s, %s, %s, %s)
+    """, (card.name, card.tag, card.ability, card.cost, card.power))
+
+conn.commit()
+cur.close()
+conn.close()
