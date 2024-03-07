@@ -11,6 +11,8 @@ from nltk import pos_tag
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 nltk.download('stopwords')
+conn = psycopg2.connect(database='snapdeck_db', user='jrivera',
+                        password='j5h4o6n6y9')
 
 
 class Card:
@@ -75,8 +77,7 @@ def storage(cards):
         cards (list): List of card instances.
     """
     # Add card information to a database
-    conn = psycopg2.connect(database='snapdeck_db', user='jrivera',
-                            password='j5h4o6n6y9')
+
     cur = conn.cursor()
 
     cur.execute('''
@@ -112,7 +113,6 @@ def storage(cards):
 
     conn.commit()
     cur.close()
-    conn.close()
 
 
 def extract_keywords(ability):
@@ -132,9 +132,57 @@ def extract_keywords(ability):
     return keywords
 
 
+def get_card_keywords(card_name):
+    """
+    Get keywords for specific card.
+
+    Args:
+        card_name (str): name of the card
+    Returns:
+        list: List of keywords
+    """
+    cur = conn.cursor()
+    cur.execute('''
+    SELECT keywords FROM cards WHERE name = %s
+    ''', (card_name,))
+    result = cur.fetchone()
+    cur.close()
+    if result:
+        return result[0]
+    else:
+        return []
+
+
+def recommend_cards(card_name, keywords):
+    """
+    Recommend cards based on keywords.
+
+    Args:
+        keywords (list): List of keywords to match
+    Returns:
+        list: List of recommended card names
+    """
+    cur = conn.cursor()
+    cur.execute('''
+    SELECT name, keywords FROM cards
+    ''')
+    results = cur.fetchall()
+    cur.close()
+    common_keywords_counts = [(name, len(set(keywords) & set(
+        card_keywords))) for name, card_keywords in results if name != card_name]
+    recommended_cards = sorted(
+        common_keywords_counts, key=lambda x: x[1], reverse=True)[:11]
+    return [name for name, _ in recommended_cards]
+
+
 if __name__ == '__main__':
     cards = scraper()
     for card in cards:
         keywords = extract_keywords(card.ability)
         card.keywords = keywords
     storage(cards)
+    card_name = 'dracula'
+    card_keywords = get_card_keywords(card_name)
+    recommended_cards = recommend_cards(card_name, card_keywords)
+    print(f'Recommended cards for {card_name}: {recommended_cards}')
+    conn.close()
