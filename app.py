@@ -7,6 +7,11 @@ import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 from nltk import pos_tag
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
 
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
@@ -18,12 +23,13 @@ conn = psycopg2.connect(database='snapdeck_db', user='jrivera',
 class Card:
     """Create class to store card information."""
 
-    def __init__(self, name, tag, ability, cost, power, keywords=None):
+    def __init__(self, name, tag, ability, cost, power, img, keywords=None):
         self.name = name
         self.tag = tag
         self.ability = ability
         self.cost = cost
         self.power = power
+        self.img = img
         self.keywords = keywords
 
 
@@ -59,11 +65,12 @@ def scraper():
             card_name = card.get('data-name')
             card_cost = card.get('data-cost')
             card_power = card.get('data-power')
+            card_img = card.get('data-src')
             card_ability_html = card.get('data-ability')
             card_ability_soup = BeautifulSoup(card_ability_html, 'html.parser')
             card_ability = card_ability_soup.get_text()
             cards.append(Card(card_name, card_tag,
-                              card_ability, card_cost, card_power))
+                              card_ability, card_cost, card_power, card_img))
 
     session.close()
     return cards
@@ -88,6 +95,7 @@ def storage(cards):
         ability TEXT,
         cost INTEGER,
         power INTEGER,
+        img TEXT,
         keywords TEXT[]
     )
     ''')
@@ -99,17 +107,17 @@ def storage(cards):
         result = cur.fetchone()
 
         if result:
-            if result[2] != card.tag or result[3] != card.ability or result[4] != card.cost or result[5] != card.power or result[6] != card.keywords:
+            if result[2] != card.tag or result[3] != card.ability or result[4] != card.cost or result[5] != card.power or result[6] != card.img or result[7] != card.keywords:
                 cur.execute('''
                 UPDATE cards
-                SET tag = %s, ability = %s, cost = %s, power = %s, keywords = %s
+                SET tag = %s, ability = %s, cost = %s, power = %s, img = %s, keywords = %s
                 WHERE name = %s
-                ''', (card.tag, card.ability, card.cost, card.power, card.keywords, card.name))
+                ''', (card.tag, card.ability, card.cost, card.power, card.img, card.keywords, card.name))
         else:
             cur.execute('''
-            INSERT INTO cards (name, tag, ability, cost, power, keywords)
-            VALUES (%s, %s, %s, %s, %s, %s)
-            ''', (card.name, card.tag, card.ability, card.cost, card.power, card.keywords))
+            INSERT INTO cards (name, tag, ability, cost, power, img, keywords)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ''', (card.name, card.tag, card.ability, card.cost, card.power, card.img, card.keywords))
 
     conn.commit()
     cur.close()
@@ -132,7 +140,7 @@ def extract_keywords(ability):
     return keywords
 
 
-def get_card_keywords(card_name):
+def get_card_keywords_and_image(card_name):
     """
     Get keywords for specific card.
 
@@ -143,9 +151,9 @@ def get_card_keywords(card_name):
     """
     cur = conn.cursor()
     cur.execute('''
-    SELECT keywords FROM cards WHERE name = %s
+    SELECT keywords, img FROM cards WHERE name = %s
     ''', (card_name,))
-    result = cur.fetchone()
+    result = cur.fetchall()
     cur.close()
     if result:
         return result[0]
@@ -164,15 +172,46 @@ def recommend_cards(card_name, keywords):
     """
     cur = conn.cursor()
     cur.execute('''
-    SELECT name, keywords FROM cards
+    SELECT name, keywords, img FROM cards
     ''')
     results = cur.fetchall()
     cur.close()
-    common_keywords_counts = [(name, len(set(keywords) & set(
-        card_keywords))) for name, card_keywords in results if name != card_name]
+    common_keywords_counts = [(name, img, len(set(keywords) & set(
+        card_keywords))) for name, card_keywords, img in results if name != card_name]
     recommended_cards = sorted(
-        common_keywords_counts, key=lambda x: x[1], reverse=True)[:11]
-    return [name for name, _ in recommended_cards]
+        common_keywords_counts, key=lambda x: x[2], reverse=True)[:11]
+    return [{'name': name, 'img': img} for name, img, _ in recommended_cards]
+
+
+@app.route('/recommendations', methods=['GET'])
+def get_recommendations():
+    card_name = request.args.get('cardName')
+    if not card_name:
+        return jsonify({'error': 'Missing cardName parameter'}), 400
+
+    card_keywords, card_img = get_card_keywords_and_image(card_name)
+    recommended_cards = recommend_cards(card_name, card_keywords)
+    recommended_cards.insert(0, {'name': card_name, 'img': card_img})
+
+    return jsonify(recommended_cards)
+
+
+@app.route('/card', methods=['GET'])
+def get_card():
+    card_name = request.args.get('cardName')
+    if not card_name:
+        return jsonify({'error': 'Missing cardName parameter'}), 400
+
+    cur = conn.cursor()
+    cur.execute('''
+    SELECT * FROM cards WHERE name = %s
+    ''', (card_name,))
+    result = cur.fetchone()
+    cur.close()
+    if result:
+        return jsonify({'img': result[7], 'ability': result[3]})
+    else:
+        return jsonify({'error': 'Card not found'}), 404
 
 
 if __name__ == '__main__':
@@ -181,8 +220,8 @@ if __name__ == '__main__':
         keywords = extract_keywords(card.ability)
         card.keywords = keywords
     storage(cards)
-    card_name = 'dracula'
-    card_keywords = get_card_keywords(card_name)
-    recommended_cards = recommend_cards(card_name, card_keywords)
-    print(f'Recommended cards for {card_name}: {recommended_cards}')
+    app.run(host='0.0.0.0', port=5000, debug=True)
     conn.close()
+
+
+# TODO: See how to get better keywords for the recommendation
