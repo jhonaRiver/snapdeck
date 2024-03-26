@@ -28,7 +28,7 @@
     color: whitesmoke;
     text-transform: uppercase;
     font-size: 4em;
-    font-weight: 100;
+    font-weight: bold;
   }
 
   @media (min-width: 640px) {

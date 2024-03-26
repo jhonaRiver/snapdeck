@@ -27,7 +27,7 @@
 </div>
 
 {#if recommendedCards.length > 0}
-  <h2>Recommended Cards:</h2>
+  <h2>Recommended Deck:</h2>
   <div class="grid">
     {#each recommendedCards as card (card)}
       <img src={card.img} alt="Card" on:click={() => selectCard(card.name)} />
@@ -36,13 +36,6 @@
 {/if}
 
 <CardModal bind:card={selectedCard} />
-
-<!-- {#if selectedCard}
-  <div>
-    <img src={selectedCard.img} alt="Card" />
-    <p>{selectedCard.ability}</p>
-  </div>
-{/if} -->
 
 <style>
   .grid {
@@ -58,6 +51,6 @@
   h2 {
     color: whitesmoke;
     font-size: 2em;
-    font-weight: 100;
+    font-weight: bold;
   }
 </style>

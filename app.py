@@ -9,6 +9,13 @@ from nltk.tokenize import word_tokenize
 from nltk import pos_tag
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+DB_NAME = os.getenv('DB_NAME')
+DB_USER = os.getenv('DB_USER')
+DB_PWD = os.getenv('DB_PWD')
 
 app = Flask(__name__)
 CORS(app)
@@ -16,8 +23,8 @@ CORS(app)
 nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 nltk.download('stopwords')
-conn = psycopg2.connect(database='snapdeck_db', user='jrivera',
-                        password='j5h4o6n6y9')
+conn = psycopg2.connect(database=DB_NAME, user=DB_USER,
+                        password=DB_PWD)
 
 
 class Card:
@@ -209,7 +216,7 @@ def get_card():
     result = cur.fetchone()
     cur.close()
     if result:
-        return jsonify({'img': result[7], 'ability': result[3]})
+        return jsonify({'img': result[7], 'ability': result[3].capitalize()})
     else:
         return jsonify({'error': 'Card not found'}), 404
 
